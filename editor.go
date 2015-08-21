@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 )
 
 type HexReader struct {
@@ -96,7 +99,7 @@ func (h *HexVerber) Read(p []byte) (int, error) {
 	return r.Read(p)
 }
 
-func main() {
+func test() {
 	flag.Parse()
 	fname := flag.Arg(0)
 	if fname == "" {
@@ -127,4 +130,54 @@ func main() {
 	i, err := verber.Write(bytesToWrite)
 	fmt.Println(i, err)
 	io.Copy(os.Stdout, &verber)
+}
+
+func main() {
+	flag.Parse()
+	fname := flag.Arg(0)
+	if fname == "" {
+		fmt.Println("You must provide a file name! :(")
+		return
+	}
+	file, err := os.OpenFile(fname, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		fmt.Println("error opening file: %s\n", err.Error())
+		return
+	}
+	verber := NewHexVerber(file)
+	stdin := bufio.NewReader(os.Stdin)
+	for {
+		verber.Seek(0, 0)
+		io.Copy(os.Stdout, &verber)
+
+		fmt.Println("")
+		fmt.Print("Edit which line?  ")
+
+		var line int64
+		fmt.Scanln(&line)
+		fmt.Println("Type in your new hex values here...")
+
+		inputBytes, _, err := stdin.ReadLine()
+		if err != nil {
+			fmt.Println("error reading: %s", err.Error())
+			continue
+		}
+		input := string(inputBytes)
+		input = strings.Replace(input, " ", "", -1)
+		runes := []rune(input)
+
+		bytes := make([]byte, 0, len(runes)/2)
+		for idx := 0; idx < len(runes); idx += 2 {
+			pair := string(runes[idx : idx+2])
+			byte64, err := strconv.ParseUint(pair, 16, 8)
+			if err != nil {
+				fmt.Printf("%v is not a valid byte: %s", pair, err.Error())
+				break
+			}
+			bytes = append(bytes, byte(byte64))
+		}
+
+		verber.Seek(line, 0)
+		verber.Write(bytes)
+	}
 }
