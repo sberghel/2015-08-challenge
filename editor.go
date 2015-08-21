@@ -31,6 +31,19 @@ func (h *HexReader) Read(p []byte) (int, error) {
 	}
 
 	var bytesInP int
+
+	copy(p, h.buffer)
+	if len(p) <= len(h.buffer) {
+		bufBytesLeft := len(h.buffer) - len(p)
+		newBuffer := make([]byte, bufBytesLeft)
+		copy(newBuffer, h.buffer)
+		h.buffer = newBuffer
+		return len(p), nil
+	} else {
+		bytesInP += len(h.buffer)
+		h.buffer = nil
+	}
+
 	var leftover []byte
 	var err error
 	for bytesInP < len(p) && err == nil {
